@@ -183,5 +183,10 @@ export const aiSkillAnalysis = (employeeId) => API.post('/ai/skill-analysis', { 
 export const aiCourseRecommendations = (employeeId) => API.post('/ai/course-recommendations', { employeeId });
 export const aiROIPrediction = (employeeId) => API.post('/ai/roi-prediction', { employeeId });
 export const aiCertificationAdvisor = (employeeId) => API.post('/ai/certification-advisor', { employeeId });
+export const applyLearningPath = (employeeId, plan) => API.post('/ai/apply-learning-path', { employeeId, plan });
+
+// Paginated helpers
+export const getEmployeesPaged = (page, limit = 20) => API.get(`/employees?page=${page}&limit=${limit}`);
+export const getCoursesPaged = (page, limit = 20) => API.get(`/courses?page=${page}&limit=${limit}`);
 
 export default API;
