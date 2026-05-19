@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { getCourses, createCourse, updateCourse, deleteCourse, getEmployees, aiCourseRecommendations } from '../services/api';
+// Note: paginated getCoursesPaged is available in api.js if needed
 import { ToastContext } from '../App';
 import Modal from '../components/Modal';
 import AIResponse from '../components/AIResponse';
@@ -18,15 +19,23 @@ function Courses() {
   const [aiData, setAiData] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiEmployeeId, setAiEmployeeId] = useState('');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState(null);
   const addToast = useContext(ToastContext);
 
   const load = async () => {
     try {
       const [c, e] = await Promise.all([getCourses(), getEmployees()]);
-      setCourses(c.data); setEmployees(e.data);
+      if (c.data && c.data.data && c.data.pagination) {
+        setCourses(c.data.data);
+        setPagination(c.data.pagination);
+      } else {
+        setCourses(Array.isArray(c.data) ? c.data : []);
+      }
+      setEmployees(Array.isArray(e.data) ? e.data : (e.data?.data || []));
     } catch (e) { addToast('Failed to load', 'error'); }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [page]);
 
   const handleSave = async () => {
     try {
@@ -127,6 +136,13 @@ function Courses() {
             ))}
           </tbody>
         </table>
+        {pagination && pagination.totalPages > 1 && (
+          <div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:'16px',padding:'16px',color:'#64748b'}}>
+            <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>← Prev</button>
+            <span>Page {pagination.page} of {pagination.totalPages} ({pagination.total} total)</span>
+            <button className="btn btn-secondary btn-sm" disabled={page >= pagination.totalPages} onClick={() => setPage(p => p + 1)}>Next →</button>
+          </div>
+        )}
       </div>
 
       {showModal && (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { getEmployees, createEmployee, updateEmployee, deleteEmployee, aiLearningPath, aiSkillAnalysis } from '../services/api';
+import { getEmployees, createEmployee, updateEmployee, deleteEmployee, aiLearningPath, aiSkillAnalysis, applyLearningPath } from '../services/api';
 import { ToastContext } from '../App';
 import Modal from '../components/Modal';
 import AIResponse from '../components/AIResponse';
@@ -19,12 +19,25 @@ function Employees() {
   const [searchTerm, setSearchTerm] = useState('');
   const [aiData, setAiData] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [applyLoading, setApplyLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState(null);
   const addToast = useContext(ToastContext);
 
-  const load = async () => {
-    try { const { data } = await getEmployees(); setEmployees(data); } catch (e) { addToast('Failed to load employees', 'error'); }
+  const load = async (p = page) => {
+    try {
+      const { data } = await getEmployees();
+      // Support both paginated and non-paginated response
+      if (data && data.data && data.pagination) {
+        setEmployees(data.data);
+        setPagination(data.pagination);
+      } else {
+        setEmployees(Array.isArray(data) ? data : []);
+        setPagination(null);
+      }
+    } catch (e) { addToast('Failed to load employees', 'error'); }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(page); }, [page]);
 
   const handleSave = async () => {
     try {
@@ -62,8 +75,21 @@ function Employees() {
       const fn = type === 'learning-path' ? aiLearningPath : aiSkillAnalysis;
       const { data } = await fn(empId);
       setAiData(data);
-    } catch (e) { addToast('AI analysis failed', 'error'); }
-    finally { setAiLoading(false); }
+    } catch (e) {
+      const errMsg = e.response?.data?.error || 'AI analysis failed';
+      addToast(errMsg, 'error');
+    } finally { setAiLoading(false); }
+  };
+
+  const handleApplyPlan = async (empId) => {
+    if (!aiData || !aiData.structured) { addToast('No structured plan to apply', 'error'); return; }
+    setApplyLoading(true);
+    try {
+      const { data } = await applyLearningPath(empId, aiData.structured);
+      addToast(`Created ${data.tracks_created} learning tracks!`, 'success');
+    } catch (e) {
+      addToast(e.response?.data?.error || 'Failed to apply plan', 'error');
+    } finally { setApplyLoading(false); }
   };
 
   const departments = [...new Set(employees.map(e => e.department).filter(Boolean))];
@@ -134,6 +160,61 @@ function Employees() {
             <button className="btn btn-ai btn-sm" onClick={() => runAI('skill-analysis', selected.id)}>AI Skill Analysis</button>
           </div>
           <AIResponse data={aiData} loading={aiLoading} />
+          {/* Structured Learning Plan Display */}
+          {aiData && aiData.structured && aiData.type === 'learning-path' && (
+            <div style={{background:'rgba(99,102,241,0.08)',border:'1px solid rgba(99,102,241,0.2)',borderRadius:'12px',padding:'20px',marginTop:'16px'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}}>
+                <h3 style={{margin:0,color:'#a5b4fc'}}>Structured Learning Plan</h3>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => handleApplyPlan(selected.id)}
+                  disabled={applyLoading}
+                >
+                  {applyLoading ? 'Applying...' : 'Apply This Plan'}
+                </button>
+              </div>
+              {aiData.structured.timeline_months && (
+                <div style={{color:'#94a3b8',fontSize:'13px',marginBottom:'12px'}}>
+                  Timeline: <strong style={{color:'#e2e8f0'}}>{aiData.structured.timeline_months} months</strong>
+                  {aiData.structured.weekly_hours_commitment && <> — <strong style={{color:'#e2e8f0'}}>{aiData.structured.weekly_hours_commitment} hrs/week</strong></>}
+                  {aiData.structured.total_budget_estimate && <> — Est. Budget: <strong style={{color:'#22c55e'}}>${aiData.structured.total_budget_estimate}</strong></>}
+                </div>
+              )}
+              {aiData.structured.recommended_courses && aiData.structured.recommended_courses.length > 0 && (
+                <div style={{overflowX:'auto'}}>
+                  <table className="data-table" style={{marginBottom:'0'}}>
+                    <thead><tr><th>Course</th><th>Duration</th><th>Priority</th><th>Reason</th></tr></thead>
+                    <tbody>
+                      {aiData.structured.recommended_courses.map((c, i) => (
+                        <tr key={i}>
+                          <td style={{fontWeight:600,color:'#e2e8f0'}}>{c.course_name}</td>
+                          <td>{c.duration_weeks} wks</td>
+                          <td>
+                            <span className={`badge ${c.priority === 'High' ? 'badge-danger' : c.priority === 'Low' ? 'badge-success' : 'badge-info'}`}>
+                              {c.priority}
+                            </span>
+                          </td>
+                          <td style={{color:'#94a3b8',fontSize:'13px'}}>{c.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {aiData.structured.certifications_to_pursue && aiData.structured.certifications_to_pursue.length > 0 && (
+                <div style={{marginTop:'16px'}}>
+                  <div style={{fontSize:'12px',color:'#64748b',fontWeight:600,marginBottom:'8px'}}>CERTIFICATIONS TO PURSUE</div>
+                  <div className="skill-tags">
+                    {aiData.structured.certifications_to_pursue.map((cert, i) => (
+                      <span key={i} className="skill-tag" title={`Provider: ${cert.provider}, Est. Cost: $${cert.estimated_cost}`}>
+                        {cert.name} {cert.estimated_cost ? `($${cert.estimated_cost})` : ''}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -155,6 +236,13 @@ function Employees() {
             ))}
           </tbody>
         </table>
+        {pagination && pagination.totalPages > 1 && (
+          <div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:'16px',padding:'16px',color:'#64748b'}}>
+            <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>← Prev</button>
+            <span>Page {pagination.page} of {pagination.totalPages} ({pagination.total} total)</span>
+            <button className="btn btn-secondary btn-sm" disabled={page >= pagination.totalPages} onClick={() => setPage(p => p + 1)}>Next →</button>
+          </div>
+        )}
       </div>
 
       {showModal && (

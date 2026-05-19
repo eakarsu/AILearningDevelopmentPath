@@ -5,6 +5,13 @@ const router = express.Router();
 
 router.get('/', auth, async (req, res) => {
   try {
+    if (req.query.page !== undefined || req.query.limit !== undefined) {
+      const page = Math.max(1, parseInt(req.query.page) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+      const offset = (page - 1) * limit;
+      const { count, rows } = await Course.findAndCountAll({ order: [['rating', 'DESC']], limit, offset });
+      return res.json({ data: rows, pagination: { total: count, page, limit, totalPages: Math.ceil(count / limit) } });
+    }
     const courses = await Course.findAll({ order: [['rating', 'DESC']] });
     res.json(courses);
   } catch (error) { res.status(500).json({ error: error.message }); }
