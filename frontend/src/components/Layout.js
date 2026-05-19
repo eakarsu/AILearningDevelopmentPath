@@ -33,6 +33,8 @@ const navItems = [
   { path: '/team-goals', label: 'Team Goals', icon: '\u2690' },
   { section: 'AI' },
   { path: '/ai-tools', label: 'AI Tools', icon: '\u2728' },
+  { section: 'Custom' },
+  { path: '/custom-views', label: 'L&D Views', icon: '\u25c9' },
 ];
 
 function Layout({ children, user, onLogout }) {

@@ -74,6 +74,9 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Custom Views (L&D) - mounted BEFORE any 404 handler
+app.use('/api/custom-views', require('./routes/customViews'));
+
 async function start() {
   try {
     await sequelize.authenticate();

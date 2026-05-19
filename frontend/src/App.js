@@ -24,6 +24,7 @@ import LearningResources from './pages/LearningResources';
 import AssessmentResults from './pages/AssessmentResults';
 import WellnessPrograms from './pages/WellnessPrograms';
 import AIToolsPage from './pages/AIToolsPage';
+import CustomViewsPage from './pages/CustomViewsPage';
 import Layout from './components/Layout';
 import Toast from './components/Toast';
 
@@ -105,6 +106,7 @@ function App() {
             <Route path="/assessments" element={<AssessmentResults />} />
             <Route path="/wellness" element={<WellnessPrograms />} />
             <Route path="/ai-tools" element={<AIToolsPage />} />
+            <Route path="/custom-views" element={<CustomViewsPage />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </Layout>
