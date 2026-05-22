@@ -76,6 +76,7 @@ app.get('/api/health', (req, res) => {
 
 // Custom Views (L&D) - mounted BEFORE any 404 handler
 app.use('/api/custom-views', require('./routes/customViews'));
+app.use('/api/skill-adjacency-mobility-map', require('./routes/skillAdjacencyMobilityMap'));
 
 async function start() {
   try {

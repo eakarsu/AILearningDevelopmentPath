@@ -25,8 +25,12 @@ import AssessmentResults from './pages/AssessmentResults';
 import WellnessPrograms from './pages/WellnessPrograms';
 import AIToolsPage from './pages/AIToolsPage';
 import CustomViewsPage from './pages/CustomViewsPage';
+import SkillAdjacencyMobilityMap from './pages/SkillAdjacencyMobilityMap';
 import Layout from './components/Layout';
 import Toast from './components/Toast';
+
+import CodexCustomVizFeature from './pages/CodexCustomVizFeature';
+import CodexOperationsFeature from './pages/CodexOperationsFeature';
 
 export const ToastContext = React.createContext();
 
@@ -70,6 +74,9 @@ function App() {
         <Router>
           <Toast toasts={toasts} />
           <Routes>
+        <Route path="/codex/custom-viz" element={<CodexCustomVizFeature />} />
+        <Route path="/codex/operations" element={<CodexOperationsFeature />} />
+
             <Route path="*" element={<Login onLogin={handleLogin} />} />
           </Routes>
         </Router>
@@ -107,6 +114,7 @@ function App() {
             <Route path="/wellness" element={<WellnessPrograms />} />
             <Route path="/ai-tools" element={<AIToolsPage />} />
             <Route path="/custom-views" element={<CustomViewsPage />} />
+            <Route path="/skill-adjacency-mobility-map" element={<SkillAdjacencyMobilityMap />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </Layout>
