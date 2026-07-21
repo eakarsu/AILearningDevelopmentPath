@@ -1,10 +1,23 @@
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
 
-// Startup env validation
-const required = ['JWT_SECRET', 'OPENROUTER_API_KEY'];
-for (const key of required) {
-  if (!process.env[key]) { console.error(`Missing: ${key}`); process.exit(1); }
+function validateRuntime(env = process.env) {
+  if (!env.JWT_SECRET || env.JWT_SECRET.length < 32) {
+    throw new Error('JWT_SECRET must contain at least 32 characters');
+  }
+  if (!env.DATABASE_URL) {
+    throw new Error('DATABASE_URL is required');
+  }
+  if (env.NODE_ENV === 'production') {
+    const origins = String(env.CLIENT_URL || '').split(',').map((value) => value.trim()).filter(Boolean);
+    if (!origins.length || origins.includes('*')) {
+      throw new Error('Production CLIENT_URL must be an explicit allowlist');
+    }
+    if (env.ALLOW_DEMO_SEED === 'true' || env.AUTO_INIT_SCHEMA === 'true') {
+      throw new Error('Production startup mutation and demo seed are prohibited');
+    }
+  }
 }
+validateRuntime();
 
 const express = require('express');
 const cors = require('cors');
@@ -77,13 +90,16 @@ app.get('/api/health', (req, res) => {
 // Custom Views (L&D) - mounted BEFORE any 404 handler
 app.use('/api/custom-views', require('./routes/customViews'));
 app.use('/api/skill-adjacency-mobility-map', require('./routes/skillAdjacencyMobilityMap'));
+app.use('/api/governed-learning-paths', require('./governance'));
 
 async function start() {
   try {
     await sequelize.authenticate();
     console.log('Database connected successfully.');
-    await sequelize.sync({ alter: true });
-    console.log('Models synchronized.');
+    if (process.env.AUTO_INIT_SCHEMA === 'true') {
+      await sequelize.sync({ alter: true });
+      console.log('Models synchronized.');
+    }
     app.listen(PORT, () => {
       console.log(`Backend server running on port ${PORT}`);
     });
@@ -95,22 +111,13 @@ async function start() {
 
 start();
 
-// === BATCH 05 AUTO-MOUNT (custom feature suggestions) ===
+// Generated prototype routes are opt-in for isolated, non-production evaluation.
+if (process.env.ENABLE_GENERATED_ROUTES === 'true' && process.env.NODE_ENV !== 'production') {
 app.use('/api/career-coach-agent', require('./routes/career-coach-agent'));
 app.use('/api/skill-demand-forecast', require('./routes/skill-demand-forecast'));
 app.use('/api/peer-mentor-matcher', require('./routes/peer-mentor-matcher'));
 app.use('/api/multi-modal-content', require('./routes/multi-modal-content'));
 app.use('/api/benchmarking-ld', require('./routes/benchmarking'));
 
-// === Batch 05 Gaps & Frontend Mounts ===
-try { const _gap_peer_match_advisor = require('./routes/gap-peer-match-advisor'); app.use('/api/gap-peer-match-advisor', _gap_peer_match_advisor); } catch(e) { console.error('gap mount fail peer-match-advisor:', e.message); }
-try { const _gap_succession_planner = require('./routes/gap-succession-planner'); app.use('/api/gap-succession-planner', _gap_succession_planner); } catch(e) { console.error('gap mount fail succession-planner:', e.message); }
-try { const _gap_training_effectiveness_analyzer = require('./routes/gap-training-effectiveness-analyzer'); app.use('/api/gap-training-effectiveness-analyzer', _gap_training_effectiveness_analyzer); } catch(e) { console.error('gap mount fail training-effectiveness-analyzer:', e.message); }
-try { const _gap_budget_optimizer = require('./routes/gap-budget-optimizer'); app.use('/api/gap-budget-optimizer', _gap_budget_optimizer); } catch(e) { console.error('gap mount fail budget-optimizer:', e.message); }
-try { const _gap_manager = require('./routes/gap-manager'); app.use('/api/gap-manager', _gap_manager); } catch(e) { console.error('gap mount fail manager:', e.message); }
-try { const _gap_peer = require('./routes/gap-peer'); app.use('/api/gap-peer', _gap_peer); } catch(e) { console.error('gap mount fail peer:', e.message); }
-try { const _gap_mentorship = require('./routes/gap-mentorship'); app.use('/api/gap-mentorship', _gap_mentorship); } catch(e) { console.error('gap mount fail mentorship:', e.message); }
-try { const _gap_learning = require('./routes/gap-learning'); app.use('/api/gap-learning', _gap_learning); } catch(e) { console.error('gap mount fail learning:', e.message); }
-try { const _gap_hris = require('./routes/gap-hris'); app.use('/api/gap-hris', _gap_hris); } catch(e) { console.error('gap mount fail hris:', e.message); }
-try { const _gap_mobile = require('./routes/gap-mobile'); app.use('/api/gap-mobile', _gap_mobile); } catch(e) { console.error('gap mount fail mobile:', e.message); }
-// === End Batch 05 Mounts ===
+}
+// Generated gap routes remain deliberately unmounted.

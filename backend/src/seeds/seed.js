@@ -1,4 +1,10 @@
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../../.env') });
+if (process.env.ALLOW_DEMO_SEED !== 'true' || process.env.NODE_ENV === 'production') {
+  throw new Error('Demo seed is quarantined; set ALLOW_DEMO_SEED=true outside production to run explicitly');
+}
+if (!process.env.DEMO_SEED_PASSWORD || process.env.DEMO_SEED_PASSWORD.length < 12) {
+  throw new Error('DEMO_SEED_PASSWORD must be explicitly supplied with at least 12 characters');
+}
 const bcrypt = require('bcryptjs');
 const { sequelize, User, Employee, LearningTrack, SkillGap, Certification, Course, ROIMeasurement,
   MentorshipProgram, TrainingEvent, PerformanceReview, LearningBudget, CompetencyFramework,
@@ -12,7 +18,7 @@ async function seed() {
     await sequelize.sync({ force: true });
     console.log('Tables created.');
 
-    const hashedPassword = await bcrypt.hash('password123', 10);
+    const hashedPassword = await bcrypt.hash(process.env.DEMO_SEED_PASSWORD, 10);
     await User.bulkCreate([
       { email: 'admin@company.com', password: hashedPassword, name: 'Admin User', role: 'admin' },
       { email: 'manager@company.com', password: hashedPassword, name: 'Sarah Manager', role: 'manager' },
@@ -429,10 +435,7 @@ async function seed() {
     console.log('Wellness Programs seeded.');
 
     console.log('\n=== All data seeded successfully! ===');
-    console.log('Login credentials:');
-    console.log('  Admin: admin@company.com / password123');
-    console.log('  Manager: manager@company.com / password123');
-    console.log('  Employee: employee@company.com / password123');
+    console.log('Demo accounts were created with the caller-supplied password.');
     process.exit(0);
   } catch (error) {
     console.error('Seeding failed:', error);

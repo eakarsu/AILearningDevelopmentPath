@@ -22,11 +22,6 @@ function Login({ onLogin }) {
     }
   };
 
-  const fillCredentials = () => {
-    setEmail('admin@company.com');
-    setPassword('password123');
-  };
-
   return (
     <div className="login-page">
       <div className="login-container">
@@ -47,14 +42,7 @@ function Login({ onLogin }) {
           <button type="submit" className="btn btn-primary" disabled={loading}>
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
-          <button type="button" className="btn btn-fill" onClick={fillCredentials}>
-            Quick Fill Demo Credentials
-          </button>
         </form>
-        <div style={{marginTop: '20px', textAlign: 'center', fontSize: '12px', color: '#64748b'}}>
-          <p>Demo accounts: admin@company.com | manager@company.com | employee@company.com</p>
-          <p>Password: password123</p>
-        </div>
       </div>
     </div>
   );

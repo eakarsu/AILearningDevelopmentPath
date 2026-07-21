@@ -1,134 +1,75 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# AI Learning & Development Path - Start Script
-# ================================================
-
-set -e
-
-PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_DIR"
+API_DIR="backend"
+UI_DIR="frontend"
+MIGRATION="backend/src/migrations/001_governed_workflows.sql"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-NC='\033[0m'
-
-echo -e "${PURPLE}"
-echo "╔══════════════════════════════════════════════════╗"
-echo "║     AI Learning & Development Path               ║"
-echo "║     Starting Application...                       ║"
-echo "╚══════════════════════════════════════════════════╝"
-echo -e "${NC}"
-
-# Load .env
-if [ -f .env ]; then
-  export $(grep -v '^#' .env | xargs)
-  echo -e "${GREEN}✓ Environment variables loaded${NC}"
-else
-  echo -e "${RED}✗ .env file not found! Please create one.${NC}"
-  exit 1
-fi
-
-BACKEND_PORT=${BACKEND_PORT:-4000}
-FRONTEND_PORT=${FRONTEND_PORT:-3000}
-
-# Function to kill processes on ports
-cleanup_ports() {
-  echo -e "${YELLOW}Cleaning up ports...${NC}"
-  for port in $BACKEND_PORT $FRONTEND_PORT; do
-    pid=$(lsof -ti:$port 2>/dev/null || true)
-    if [ -n "$pid" ]; then
-      echo -e "${YELLOW}  Killing process on port $port (PID: $pid)${NC}"
-      kill -9 $pid 2>/dev/null || true
-      sleep 1
-    fi
-  done
-  echo -e "${GREEN}✓ Ports cleaned${NC}"
-}
-
-# Cleanup on exit
-cleanup() {
-  echo -e "\n${YELLOW}Shutting down...${NC}"
-  cleanup_ports
-  # Kill background processes
-  jobs -p | xargs -r kill 2>/dev/null || true
-  echo -e "${GREEN}✓ Application stopped${NC}"
-  exit 0
-}
-trap cleanup SIGINT SIGTERM EXIT
-
-# Clean up ports first
-cleanup_ports
-
-# Check PostgreSQL
-echo -e "${BLUE}Checking PostgreSQL...${NC}"
-if command -v pg_isready &>/dev/null; then
-  if pg_isready -q 2>/dev/null; then
-    echo -e "${GREEN}✓ PostgreSQL is running${NC}"
-  else
-    echo -e "${YELLOW}Starting PostgreSQL...${NC}"
-    if command -v brew &>/dev/null; then
-      brew services start postgresql@14 2>/dev/null || brew services start postgresql 2>/dev/null || true
-    fi
-    sleep 2
+check() {
+  command -v node >/dev/null || { echo "node is required" >&2; return 1; }
+  command -v npm >/dev/null || { echo "npm is required" >&2; return 1; }
+  [[ -f .env ]] || { echo "Create .env from .env.example; defaults are not generated." >&2; return 1; }
+  grep -Eq '^JWT_SECRET=.{32,}$' .env || { echo "JWT_SECRET must contain at least 32 characters." >&2; return 1; }
+  grep -Eq '^GOVERNANCE_TENANT_ID=[A-Za-z0-9][A-Za-z0-9._:-]+$' .env ||
+    { echo "GOVERNANCE_TENANT_ID is required for signed tenant claims." >&2; return 1; }
+  grep -Eq '^DATABASE_URL=.+|^DB_HOST=.+' .env ||
+    { echo "DATABASE_URL or explicit DB_* settings are required." >&2; return 1; }
+  if grep -Eqi 'password123|secure123|your_.*key|change[_-]?me|placeholder' .env; then
+    echo "Refusing placeholder or demo credentials." >&2
+    return 1
   fi
-fi
+  echo "Configuration shape is valid; credentials and connectivity were not verified."
+}
 
-# Create database if not exists
-echo -e "${BLUE}Setting up database...${NC}"
-DB_NAME=$(echo $DATABASE_URL | sed 's/.*\///')
-createdb "$DB_NAME" 2>/dev/null || echo -e "${YELLOW}  Database '$DB_NAME' already exists${NC}"
-echo -e "${GREEN}✓ Database ready${NC}"
+migrate() {
+  check
+  [[ "${ALLOW_SCHEMA_MIGRATION:-false}" == "true" ]] ||
+    { echo "Set ALLOW_SCHEMA_MIGRATION=true for this explicit operation." >&2; return 1; }
+  : "${DATABASE_URL:?Export DATABASE_URL for the migration process.}"
+  command -v psql >/dev/null || { echo "psql is required" >&2; return 1; }
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$MIGRATION"
+}
 
-# Install dependencies
-echo -e "${BLUE}Installing backend dependencies...${NC}"
-cd "$PROJECT_DIR/backend"
-npm install --silent 2>&1 | tail -1
-echo -e "${GREEN}✓ Backend dependencies installed${NC}"
+start_services() {
+  check
+  [[ -d "$API_DIR/node_modules" ]] ||
+    { echo "Backend dependencies are absent; run reviewed locked installs separately." >&2; return 1; }
 
-echo -e "${BLUE}Installing frontend dependencies...${NC}"
-cd "$PROJECT_DIR/frontend"
-npm install --silent 2>&1 | tail -1
-echo -e "${GREEN}✓ Frontend dependencies installed${NC}"
+  if [[ "${NODE_ENV:-}" == "test" ]]; then
+    exec npm --prefix "$API_DIR" start
+  fi
 
-# Seed database
-echo -e "${BLUE}Seeding database...${NC}"
-cd "$PROJECT_DIR/backend"
-node src/seeds/seed.js
-echo -e "${GREEN}✓ Database seeded${NC}"
+  [[ -d "$UI_DIR/node_modules" ]] ||
+    { echo "Frontend dependencies are absent; run reviewed locked installs separately." >&2; return 1; }
 
-# Start backend with nodemon (auto-reload)
-echo -e "${BLUE}Starting backend on port $BACKEND_PORT with auto-reload...${NC}"
-cd "$PROJECT_DIR/backend"
-npx nodemon src/server.js &
-BACKEND_PID=$!
-sleep 3
-echo -e "${GREEN}✓ Backend running (PID: $BACKEND_PID)${NC}"
+  frontend_port="${FRONTEND_PORT:-${CLIENT_PORT:-3000}}"
+  client_url="${CLIENT_URL:-}"
+  if [[ "${NODE_ENV:-development}" != "production" ]]; then
+    client_url="${client_url:-http://127.0.0.1:$frontend_port}"
+  fi
 
-# Start frontend with auto-reload (built-in with react-scripts)
-echo -e "${BLUE}Starting frontend on port $FRONTEND_PORT with auto-reload...${NC}"
-cd "$PROJECT_DIR/frontend"
-PORT=$FRONTEND_PORT BROWSER=none npm start &
-FRONTEND_PID=$!
-sleep 3
-echo -e "${GREEN}✓ Frontend running (PID: $FRONTEND_PID)${NC}"
+  CLIENT_URL="$client_url" npm --prefix "$API_DIR" start &
+  api_pid=$!
+  if node -e "const p=require('./$UI_DIR/package.json');process.exit(p.scripts&&p.scripts.dev?0:1)"; then
+    PORT="$frontend_port" REACT_APP_API_URL="${REACT_APP_API_URL:-http://127.0.0.1:${BACKEND_PORT:-4000}/api}" npm --prefix "$UI_DIR" run dev &
+  else
+    BROWSER=none PORT="$frontend_port" REACT_APP_API_URL="${REACT_APP_API_URL:-http://127.0.0.1:${BACKEND_PORT:-4000}/api}" npm --prefix "$UI_DIR" start &
+  fi
+  ui_pid=$!
 
-echo ""
-echo -e "${PURPLE}╔══════════════════════════════════════════════════╗${NC}"
-echo -e "${PURPLE}║  ${GREEN}Application is running!${PURPLE}                          ║${NC}"
-echo -e "${PURPLE}║                                                  ║${NC}"
-echo -e "${PURPLE}║  ${BLUE}Frontend: ${NC}http://localhost:$FRONTEND_PORT${PURPLE}               ║${NC}"
-echo -e "${PURPLE}║  ${BLUE}Backend:  ${NC}http://localhost:$BACKEND_PORT${PURPLE}               ║${NC}"
-echo -e "${PURPLE}║                                                  ║${NC}"
-echo -e "${PURPLE}║  ${YELLOW}Login: admin@company.com / password123${PURPLE}          ║${NC}"
-echo -e "${PURPLE}║                                                  ║${NC}"
-echo -e "${PURPLE}║  ${NC}Press Ctrl+C to stop${PURPLE}                             ║${NC}"
-echo -e "${PURPLE}║  ${NC}Code changes auto-reload${PURPLE}                         ║${NC}"
-echo -e "${PURPLE}╚══════════════════════════════════════════════════╝${NC}"
-echo ""
+  cleanup() {
+    kill "$api_pid" "$ui_pid" 2>/dev/null || true
+    wait "$api_pid" "$ui_pid" 2>/dev/null || true
+  }
+  trap cleanup EXIT INT TERM
+  wait "$api_pid" "$ui_pid"
+}
 
-# Wait for background processes
-wait
+case "${1:-check}" in
+  check) check ;;
+  migrate) migrate ;;
+  start) start_services ;;
+  *) echo "Usage: ./start.sh [check|migrate|start]" >&2; exit 64 ;;
+esac
