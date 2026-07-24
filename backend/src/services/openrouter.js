@@ -3,6 +3,11 @@ const https = require('https');
 async function callOpenRouter(prompt, systemPrompt = 'You are an expert HR and Learning & Development AI assistant.') {
   const apiKey = process.env.OPENROUTER_API_KEY;
   const model = process.env.OPENROUTER_MODEL || 'anthropic/claude-3-5-sonnet-20241022';
+  const baseUrl = new URL(process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1');
+
+  if (!apiKey) {
+    throw new Error('OPENROUTER_API_KEY is required');
+  }
 
   const body = JSON.stringify({
     model,
@@ -16,8 +21,10 @@ async function callOpenRouter(prompt, systemPrompt = 'You are an expert HR and L
 
   return new Promise((resolve, reject) => {
     const options = {
-      hostname: 'openrouter.ai',
-      path: '/api/v1/chat/completions',
+      protocol: baseUrl.protocol,
+      hostname: baseUrl.hostname,
+      port: baseUrl.port || undefined,
+      path: `${baseUrl.pathname.replace(/\/$/, '')}/chat/completions`,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
