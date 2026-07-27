@@ -80,7 +80,7 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_DIR"
 API_DIR="backend"
 UI_DIR="frontend"
-MIGRATION="backend/src/migrations/001_governed_workflows.sql"
+MIGRATION_DIR="backend/src/migrations"
 
 check() {
   command -v node >/dev/null || { echo "node is required" >&2; return 1; }
@@ -104,7 +104,9 @@ migrate() {
     { echo "Set ALLOW_SCHEMA_MIGRATION=true for this explicit operation." >&2; return 1; }
   : "${DATABASE_URL:?Export DATABASE_URL for the migration process.}"
   command -v psql >/dev/null || { echo "psql is required" >&2; return 1; }
-  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$MIGRATION"
+  for migration in "$MIGRATION_DIR"/*.sql; do
+    psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+  done
 }
 
 start_services() {

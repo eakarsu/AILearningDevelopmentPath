@@ -90,6 +90,7 @@ app.get('/api/health', (req, res) => {
 // Custom Views (L&D) - mounted BEFORE any 404 handler
 app.use('/api/custom-views', require('./routes/customViews'));
 app.use('/api/skill-adjacency-mobility-map', require('./routes/skillAdjacencyMobilityMap'));
+app.use('/api/workforce-transformation', require('./routes/workforceTransformation'));
 app.use('/api/governed-learning-paths', require('./governance'));
 
 async function start() {

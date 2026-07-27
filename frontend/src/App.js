@@ -26,6 +26,7 @@ import WellnessPrograms from './pages/WellnessPrograms';
 import AIToolsPage from './pages/AIToolsPage';
 import CustomViewsPage from './pages/CustomViewsPage';
 import SkillAdjacencyMobilityMap from './pages/SkillAdjacencyMobilityMap';
+import WorkforceTransformationWorkbench from './pages/WorkforceTransformationWorkbench';
 import Layout from './components/Layout';
 import Toast from './components/Toast';
 
@@ -115,6 +116,7 @@ function App() {
             <Route path="/ai-tools" element={<AIToolsPage />} />
             <Route path="/custom-views" element={<CustomViewsPage />} />
             <Route path="/skill-adjacency-mobility-map" element={<SkillAdjacencyMobilityMap />} />
+            <Route path="/workforce-transformation" element={<WorkforceTransformationWorkbench />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </Layout>

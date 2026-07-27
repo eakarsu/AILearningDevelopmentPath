@@ -31,6 +31,8 @@ const navItems = [
   { path: '/learning-budgets', label: 'Learning Budgets', icon: '\u20AC' },
   { path: '/competency-frameworks', label: 'Competency Frameworks', icon: '\u2699' },
   { path: '/team-goals', label: 'Team Goals', icon: '\u2690' },
+  { section: 'Workforce transformation' },
+  { path: '/workforce-transformation', label: 'Transition OS', icon: '\u21c4' },
   { section: 'AI' },
   { path: '/ai-tools', label: 'AI Tools', icon: '\u2728' },
   { section: 'Custom' },
