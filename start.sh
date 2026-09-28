@@ -125,6 +125,10 @@ start_services() {
   [[ -d "$UI_DIR/node_modules" ]] ||
     { echo "Frontend dependencies are absent; run reviewed locked installs separately." >&2; return 1; }
 
+  if [[ "${NODE_ENV:-development}" != "production" && "${ENABLE_DEMO_CREDENTIAL_AUTOFILL:-true}" == "true" ]]; then
+    node "$API_DIR/src/scripts/provision-demo-credentials.js"
+  fi
+
   frontend_port="${FRONTEND_PORT:-${CLIENT_PORT:-3000}}"
   client_url="${CLIENT_URL:-}"
   if [[ "${NODE_ENV:-development}" != "production" ]]; then
